@@ -13,4 +13,6 @@ target_sources(app PRIVATE
   src/main.c
 )
 
+add_subdirectory(src/mpsl_esb)
+
 # NORDIC SDK APP END

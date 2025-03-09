@@ -1,0 +1,16 @@
+config APP_ESB_PRX_LISTEN_WINDOW_US
+	int "ESB PRX listening Window in microseconds"
+	default 5000
+	help
+        The length of the MPSL timeslot in microseconds. In the timeslot, the ESB PRX listens for incoming packets.
+
+config APP_ESB_PRX_LISTEN_INTERVAL_US
+    int "ESB PRX listening interval in microseconds"
+    default 500000
+    help
+        The interval between the ESB PRX listening windows in microseconds.
+
+
+module = APP_ESB
+module-str = app-esb
+source "subsys/logging/Kconfig.template.log_config"

@@ -233,7 +233,14 @@ int main(void)
 		return 0;
 	}
 
-	err = bt_le_adv_start(BT_LE_ADV_CONN, ad, ARRAY_SIZE(ad),
+    struct bt_le_adv_param adv_param = {
+        .options = BT_LE_ADV_OPT_CONNECTABLE,
+        .interval_min = 1600, // 1600*0.625 = 1s
+        .interval_max = 1600, // 1600*0.625 = 1s
+        .peer = NULL,
+    };
+
+	err = bt_le_adv_start(&adv_param, ad, ARRAY_SIZE(ad),
 			      sd, ARRAY_SIZE(sd));
 	if (err) {
 		printk("Advertising failed to start (err %d)\n", err);

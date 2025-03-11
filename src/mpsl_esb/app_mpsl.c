@@ -96,11 +96,13 @@ static void set_timeslot_active_status(bool active)
 	if (active) {
 		if (!m_in_timeslot) {
 			m_in_timeslot = true;
+            NRF_P0->OUTSET = BIT(28);
 			m_mpsl_cb(APP_TS_STARTED);
 		}
 	} else {
 		if (m_in_timeslot) {
 			m_in_timeslot = false;
+            NRF_P0->OUTCLR = BIT(28);
 			m_mpsl_cb(APP_TS_STOPPED);
 		}
 	}
@@ -296,11 +298,14 @@ static mpsl_timeslot_signal_return_param_t *mpsl_timeslot_callback(
 */
 static void mpsl_nonpreemptible_thread(void)
 {
-int err;
-enum mpsl_timeslot_call api_call = 0;
+    int err;
+    enum mpsl_timeslot_call api_call = 0;
 
-IRQ_DIRECT_CONNECT(LOG_OFFLOAD_IRQn, 1, swi1_isr, 0);
-irq_enable(LOG_OFFLOAD_IRQn);
+    IRQ_DIRECT_CONNECT(LOG_OFFLOAD_IRQn, 1, swi1_isr, 0);
+    irq_enable(LOG_OFFLOAD_IRQn);
+
+    NRF_P0->DIRSET = BIT(28);
+	NRF_P0->OUTCLR = BIT(28);
 
     /* Initialize to invalid session id */
     mpsl_timeslot_session_id_t session_id = 0xFFu;

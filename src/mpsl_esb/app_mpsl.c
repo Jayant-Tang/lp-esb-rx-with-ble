@@ -136,6 +136,10 @@ void app_mpsl_timeslot_isr_register(app_mpsl_timeslot_cb_t cb)
     m_mpsl_cb = cb;
 }
 
+// this is a wrapper function for the radio irq handler from `esb.c` in NCS
+// the esb.c file has been modified
+extern void app_mpsl_esb_radio_irq_handler_wrapper(void);
+
 static mpsl_timeslot_signal_return_param_t *mpsl_timeslot_callback(
     mpsl_timeslot_session_id_t session_id,
     uint32_t signal_type)
@@ -202,7 +206,8 @@ static mpsl_timeslot_signal_return_param_t *mpsl_timeslot_callback(
             MPSL_TIMESLOT_SIGNAL_ACTION_NONE;
         p_ret_val = &signal_callback_return_param;
 
-        // Do nothing. Since we have enabled CONFIG_MPSL_DYNAMIC_INTERRUPTS=y and CONFIG_ESB_DYNAMIC_INTERRUPTS=y
+        // forward this signal to the ESB IRQ handler
+        app_mpsl_esb_radio_irq_handler_wrapper();
 
         break;
 

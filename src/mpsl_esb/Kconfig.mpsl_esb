@@ -9,7 +9,12 @@ config APP_ESB_PRX_LISTEN_INTERVAL_US
     default 500000
     help
         The interval between the ESB PRX listening windows in microseconds.
-
+config APP_ESB_OVER_MPSL
+    bool
+    default y
+    help
+        This configuration indicates that the ESB is used over the MPSL.
+        Do not disable this configuration.  
 
 module = APP_ESB
 module-str = app-esb

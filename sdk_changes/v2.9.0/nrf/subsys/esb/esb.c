@@ -1604,6 +1604,14 @@ static void radio_irq_handler(void)
 #endif /* defined(CONFIG_ESB_FAST_CHANNEL_SWITCHING) */
 }
 
+
+#if IS_ENABLED(CONFIG_APP_ESB_OVER_MPSL)
+void app_mpsl_esb_radio_irq_handler_wrapper(void)
+{
+    radio_irq_handler();
+}
+#endif
+
 static void esb_evt_irq_handler(void)
 {
 	uint32_t interrupts;
@@ -1692,21 +1700,6 @@ static void esb_irq_disable(void)
 	irq_disable(ESB_RADIO_IRQ_NUMBER);
 	irq_disable(ESB_EVT_IRQ_NUMBER);
 	irq_disable(ESB_TIMER_IRQ);
-
-#if IS_ENABLED(CONFIG_ESB_DYNAMIC_INTERRUPTS) && IS_ENABLED(CONFIG_SHARED_INTERRUPTS)
-
-	unsigned int key = irq_lock();
-
-	irq_disconnect_dynamic(ESB_RADIO_IRQ_NUMBER, CONFIG_ESB_RADIO_IRQ_PRIORITY,
-		radio_dynamic_irq_handler, NULL, 0);
-	irq_disconnect_dynamic(ESB_EVT_IRQ_NUMBER, CONFIG_ESB_EVENT_IRQ_PRIORITY,
-		evt_dynamic_irq_handler, NULL, 0);
-	irq_disconnect_dynamic(ESB_TIMER_IRQ, CONFIG_ESB_EVENT_IRQ_PRIORITY,
-		timer_dynamic_irq_handler, NULL, 0);
-
-	irq_unlock(key);
-
-#endif /* IS_ENABLED(CONFIG_ESB_DYNAMIC_INTERRUPTS) && IS_ENABLED(CONFIG_SHARED_INTERRUPTS) */
 }
 
 int esb_init(const struct esb_config *config)
@@ -1766,20 +1759,27 @@ int esb_init(const struct esb_config *config)
 		nrf_radio_int_enable(NRF_RADIO, NRF_RADIO_INT_RXREADY_MASK);
 #endif /* defined(CONFIG_ESB_FAST_CHANNEL_SWITCHING) */
 
+// When using MPSL, don't connect the IRQs here, as they are connected in the MPSL
+// just forward the MPSL_TIMESLOT_SIGNAL_RADIO interrupts to the ESB IRQs
+
 #if IS_ENABLED(CONFIG_ESB_DYNAMIC_INTERRUPTS)
 
 	/* Ensure IRQs are disabled before attaching. */
 	esb_irq_disable();
 
+#if !IS_ENABLED(CONFIG_APP_ESB_OVER_MPSL)
 	ARM_IRQ_DIRECT_DYNAMIC_CONNECT(ESB_RADIO_IRQ_NUMBER, CONFIG_ESB_RADIO_IRQ_PRIORITY,
 				       0, reschedule);
+#endif /* !IS_ENABLED(CONFIG_APP_ESB_OVER_MPSL) */
 	ARM_IRQ_DIRECT_DYNAMIC_CONNECT(ESB_EVT_IRQ_NUMBER, CONFIG_ESB_EVENT_IRQ_PRIORITY,
 				       0, reschedule);
 	ARM_IRQ_DIRECT_DYNAMIC_CONNECT(ESB_TIMER_IRQ, CONFIG_ESB_EVENT_IRQ_PRIORITY,
 				       0, reschedule);
 
+#if !IS_ENABLED(CONFIG_APP_ESB_OVER_MPSL)
 	irq_connect_dynamic(ESB_RADIO_IRQ_NUMBER, CONFIG_ESB_RADIO_IRQ_PRIORITY,
 			    radio_dynamic_irq_handler, NULL, 0);
+#endif /* !IS_ENABLED(CONFIG_APP_ESB_OVER_MPSL) */
 	irq_connect_dynamic(ESB_EVT_IRQ_NUMBER, CONFIG_ESB_EVENT_IRQ_PRIORITY,
 			    evt_dynamic_irq_handler, NULL, 0);
 	irq_connect_dynamic(ESB_TIMER_IRQ, CONFIG_ESB_EVENT_IRQ_PRIORITY,
@@ -1787,8 +1787,10 @@ int esb_init(const struct esb_config *config)
 
 #else /* !IS_ENABLED(CONFIG_ESB_DYNAMIC_INTERRUPTS) */
 
+#if !IS_ENABLED(CONFIG_APP_ESB_OVER_MPSL)
 	IRQ_DIRECT_CONNECT(ESB_RADIO_IRQ_NUMBER, CONFIG_ESB_RADIO_IRQ_PRIORITY,
 			   esb_radio_direct_irq_handler, 0);
+#endif /* !IS_ENABLED(CONFIG_APP_ESB_OVER_MPSL) */
 	IRQ_DIRECT_CONNECT(ESB_EVT_IRQ_NUMBER, CONFIG_ESB_EVENT_IRQ_PRIORITY,
 			   esb_evt_direct_irq_handler, 0);
 	IRQ_DIRECT_CONNECT(ESB_TIMER_IRQ, CONFIG_ESB_EVENT_IRQ_PRIORITY,

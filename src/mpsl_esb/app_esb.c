@@ -113,13 +113,13 @@ int esb_uninitialize_and_stop_rx(void)
         return err;
     }
 
-    // err = esb_flush_rx();
-    // if (err) {
-    //     LOG_ERR("ESB RX flush failed, err %d", err);
-    //     return err;
-    // }
+    err = esb_flush_rx();
+    if (err) {
+        LOG_ERR("ESB RX flush failed, err %d", err);
+        return err;
+    }
 
-    // esb_disable();
+    esb_disable();
     return 0;
 }
 

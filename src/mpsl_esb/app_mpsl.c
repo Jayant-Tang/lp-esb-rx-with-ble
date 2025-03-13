@@ -93,6 +93,7 @@ K_MSGQ_DEFINE(mpsl_api_msgq, sizeof(enum mpsl_timeslot_call), 10, 4);
 
 static void set_timeslot_active_status(bool active)
 {
+    unsigned int key = irq_lock();
 	if (active) {
 		if (!m_in_timeslot) {
 			m_in_timeslot = true;
@@ -106,6 +107,7 @@ static void set_timeslot_active_status(bool active)
 			m_mpsl_cb(APP_TS_STOPPED);
 		}
 	}
+    irq_unlock(key);
 }
 
 

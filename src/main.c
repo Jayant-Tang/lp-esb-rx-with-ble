@@ -59,6 +59,41 @@ static void connected(struct bt_conn *conn, uint8_t err)
 	printk("Connected\n");
 
 	dk_set_led_on(CON_STATUS_LED);
+
+	struct bt_le_conn_param param = {
+		.interval_min = 240, // 240*1.25ms = 300ms
+		.interval_max = 480, // 480*1.25ms = 600ms
+		.latency = 0,       
+		.timeout = 200,     // 200*10ms = 2s
+        /**
+         * Bluetooth requries:
+         *   Timeout_ms > 2 * (1 + latency_ms) * interval_max_ms
+         * 
+		 * variable style:
+         *   timeout * 4 > (1 + latency) * interval_max
+         */
+        /**
+         * iOS Requriements:
+         *   - Interval Min ≥ 15 ms (multiples of 15 ms)
+         *   - Interval Min + 15 ms ≤ Interval Max (Interval Max == 15 ms is allowed)
+         *   - Interval Max * (Slave Latency + 1) ≤ 2 seconds
+         *   - Interval Max * (Slave Latency + 1) * 3 < connSupervisionTimeout
+         *   - Slave Latency ≤ 30
+         *   - 2 seconds ≤ connSupervisionTimeout ≤ 6 seconds
+         */
+
+	};
+
+	int ret = bt_conn_le_param_update(conn, &param);
+
+	if (ret == -EALREADY) {
+        printk("Connection parameters are already set.");
+		ret = 0;
+	}
+    
+    if (ret) {
+        printk("Failed to update connection parameters (ret %d)", ret);
+    }
 }
 
 static void disconnected(struct bt_conn *conn, uint8_t reason)

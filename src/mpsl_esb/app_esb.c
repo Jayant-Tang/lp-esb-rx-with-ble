@@ -23,14 +23,7 @@ static struct esb_payload rx_payload;
 static struct esb_payload tx_payload = ESB_CREATE_PAYLOAD(0,
 	0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17);
 
-void timeslot_callback(app_ts_state_t state)
-{
-    int err = 0;
-    err = k_msgq_put(&app_timeslot_msgq, &state, K_NO_WAIT);
-	if (err) {
-		LOG_ERR("Message sent error: %d", err);
-	}
-}
+
 
 void event_handler(struct esb_evt const *event)
 {
@@ -43,7 +36,7 @@ void event_handler(struct esb_evt const *event)
 		break;
 	case ESB_EVENT_RX_RECEIVED:
 		if (esb_read_rx_payload(&rx_payload) == 0) {
-			LOG_DBG("Packet received, len %d : "
+			LOG_INF("Packet received, len %d : "
 				"0x%02x, 0x%02x, 0x%02x, 0x%02x, "
 				"0x%02x, 0x%02x, 0x%02x, 0x%02x",
 				rx_payload.length, rx_payload.data[0],
@@ -120,14 +113,39 @@ int esb_uninitialize_and_stop_rx(void)
         return err;
     }
 
-    err = esb_flush_rx();
-    if (err) {
-        LOG_ERR("ESB RX flush failed, err %d", err);
-        return err;
-    }
+    // err = esb_flush_rx();
+    // if (err) {
+    //     LOG_ERR("ESB RX flush failed, err %d", err);
+    //     return err;
+    // }
 
-    esb_disable();
+    // esb_disable();
     return 0;
+}
+
+void timeslot_callback(app_ts_state_t state)
+{
+    // int err = 0;
+    // err = k_msgq_put(&app_timeslot_msgq, &state, K_NO_WAIT);
+	// if (err) {
+	// 	LOG_ERR("Message sent error: %d", err);
+	// }
+	switch (state) {
+	case APP_TS_STARTED:{
+		esb_initialize_and_rx();
+		LOG_DBG("Callback: Timeslot start\n");
+		break;
+		}
+	case APP_TS_STOPPED:{
+		esb_uninitialize_and_stop_rx();
+		LOG_DBG("Callback: Timeslot stopped\n");
+		break;
+		}
+	default:{
+		LOG_DBG("Callback: Other signal: %d\n", state);
+		break;
+		}
+	}
 }
 
 static int app_esb_thread_entry()
@@ -141,31 +159,32 @@ static int app_esb_thread_entry()
     app_mpsl_timeslot_start();
 
     while(1) {
-        app_ts_state_t state = 0;
-        int err = k_msgq_get(&app_timeslot_msgq, &state, K_FOREVER);
-        if (err){
-            LOG_ERR("Message receive error: %d", err);
-            continue;
-            }
-        switch (state) {
-        case APP_TS_STARTED:{
-            esb_initialize_and_rx();
-            LOG_DBG("Callback: Timeslot start\n");
-            break;
-            }
-        case APP_TS_STOPPED:{
-            esb_uninitialize_and_stop_rx();
-            LOG_DBG("Callback: Timeslot stopped\n");
-            break;
-         }
-        default:{
-            LOG_DBG("Callback: Other signal: %d\n", state);
-            break;
-            }
-        }
+		k_sleep(K_FOREVER);
+        // app_ts_state_t state = 0;
+        // int err = k_msgq_get(&app_timeslot_msgq, &state, K_FOREVER);
+        // if (err){
+        //     LOG_ERR("Message receive error: %d", err);
+        //     continue;
+        //     }
+        // switch (state) {
+        // case APP_TS_STARTED:{
+        //     esb_initialize_and_rx();
+        //     LOG_INF("Callback: Timeslot start\n");
+        //     break;
+        //     }
+        // case APP_TS_STOPPED:{
+        //     esb_uninitialize_and_stop_rx();
+        //     LOG_INF("Callback: Timeslot stopped\n");
+        //     break;
+        //  }
+        // default:{
+        //     LOG_DBG("Callback: Other signal: %d\n", state);
+        //     break;
+        //     }
+        // }
     }
 
     return 0;
 }
 
-K_THREAD_DEFINE(i2c_slave_id, STACK_SIZE, app_esb_thread_entry, NULL, NULL, NULL, PRIORITY, 0, 0);
+K_THREAD_DEFINE(app_esb_id, STACK_SIZE, app_esb_thread_entry, NULL, NULL, NULL, PRIORITY, 0, 0);

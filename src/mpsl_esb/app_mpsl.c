@@ -78,7 +78,7 @@ static mpsl_timeslot_request_t timeslot_request_when_blocked = {
     .request_type = MPSL_TIMESLOT_REQ_TYPE_NORMAL,
     .params.normal.hfclk = MPSL_TIMESLOT_HFCLK_CFG_XTAL_GUARANTEED,
     .params.normal.priority = MPSL_TIMESLOT_PRIORITY_NORMAL,
-    .params.normal.distance_us = TIMESLOT_REQUEST_DISTANCE_US * 2.3f,
+    .params.normal.distance_us = TIMESLOT_REQUEST_DISTANCE_US * 2,
     .params.normal.length_us = TIMESLOT_LENGTH_US
 };
 
@@ -96,59 +96,18 @@ static void set_timeslot_active_status(bool active)
 	if (active) {
 		if (!m_in_timeslot) {
 			m_in_timeslot = true;
-            NRF_P0->OUTSET = BIT(28);
+            // NRF_P0->OUTSET = BIT(28);
 			m_mpsl_cb(APP_TS_STARTED);
 		}
 	} else {
 		if (m_in_timeslot) {
 			m_in_timeslot = false;
-            NRF_P0->OUTCLR = BIT(28);
+            // NRF_P0->OUTCLR = BIT(28);
 			m_mpsl_cb(APP_TS_STOPPED);
 		}
 	}
 }
 
-ISR_DIRECT_DECLARE(swi1_isr)
-{
-    uint8_t signal_type = 0;
-
-    while (!ring_buf_is_empty(&callback_high_priority_ring_buf)) {
-        if (ring_buf_get(&callback_high_priority_ring_buf, &signal_type, 1) == 1) {
-            switch (signal_type) {
-            case MPSL_TIMESLOT_SIGNAL_START:
-                set_timeslot_active_status(true);
-                break;
-            case MPSL_TIMESLOT_SIGNAL_TIMER0:
-                set_timeslot_active_status(false);
-                break;
-            case MPSL_TIMESLOT_SIGNAL_RADIO:
-                LOG_DBG("Callback: Radio signal\n");
-                break;
-            default:
-                LOG_DBG("Callback: Other signal: %d\n", signal_type);
-                break;
-            }
-        }
-    }
-
-    while (!ring_buf_is_empty(&callback_low_priority_ring_buf)) {
-        if (ring_buf_get(&callback_low_priority_ring_buf, &signal_type, 1) == 1) {
-            switch (signal_type) {
-            case MPSL_TIMESLOT_SIGNAL_SESSION_IDLE:
-                LOG_DBG("Callback: Session idle\n");
-                break;
-            case MPSL_TIMESLOT_SIGNAL_SESSION_CLOSED:
-                LOG_DBG("Callback: Session closed\n");
-                break;
-            default:
-                LOG_DBG("Callback: Other signal: %d\n", signal_type);
-                break;
-            }
-        }
-    }
-
-    return 1;
-}
 
 void app_mpsl_session_operation(enum mpsl_timeslot_call api_call)
 {
@@ -185,6 +144,10 @@ static mpsl_timeslot_signal_return_param_t *mpsl_timeslot_callback(
 
     mpsl_timeslot_signal_return_param_t *p_ret_val = NULL;
 
+    signal_callback_return_param.callback_action =
+            MPSL_TIMESLOT_SIGNAL_ACTION_NONE;
+        p_ret_val = &signal_callback_return_param;
+
     switch (signal_type) {
 
     case MPSL_TIMESLOT_SIGNAL_START:
@@ -205,11 +168,8 @@ static mpsl_timeslot_signal_return_param_t *mpsl_timeslot_callback(
         nrf_timer_cc_set(MPSL_TIMER0, NRF_TIMER_CC_CHANNEL0,
             TIMER_EXPIRY_US);
         nrf_timer_int_enable(MPSL_TIMER0, NRF_TIMER_INT_COMPARE0_MASK);
-        input_data_len = ring_buf_put(&callback_high_priority_ring_buf, &input_data, 1);
-        if (input_data_len != 1) {
-            LOG_ERR("Full ring buffer, enqueue data with length %d", input_data_len);
-            k_oops();
-        }
+        
+        set_timeslot_active_status(true);
         break;
     case MPSL_TIMESLOT_SIGNAL_TIMER0:
 
@@ -230,11 +190,7 @@ static mpsl_timeslot_signal_return_param_t *mpsl_timeslot_callback(
         }
 
         p_ret_val = &signal_callback_return_param;
-        input_data_len = ring_buf_put(&callback_high_priority_ring_buf, &input_data, 1);
-        if (input_data_len != 1) {
-            LOG_ERR("Full ring buffer, enqueue data with length %d", input_data_len);
-            k_oops();
-        }
+        set_timeslot_active_status(false);
         break;
 
     case MPSL_TIMESLOT_SIGNAL_RADIO:
@@ -244,50 +200,77 @@ static mpsl_timeslot_signal_return_param_t *mpsl_timeslot_callback(
             MPSL_TIMESLOT_SIGNAL_ACTION_NONE;
         p_ret_val = &signal_callback_return_param;
 
-        // TODO:
-        // if(m_in_timeslot) {
-        //     RADIO_IRQHandler();
-        // } else {
-        //     NVIC_ClearPendingIRQ(RADIO_IRQn);
-        //     NVIC_DisableIRQ(RADIO_IRQn);
-        // }
+        // Do nothing. Since we have enabled CONFIG_MPSL_DYNAMIC_INTERRUPTS=y and CONFIG_ESB_DYNAMIC_INTERRUPTS=y
 
         break;
 
-    case MPSL_TIMESLOT_SIGNAL_SESSION_IDLE:
-        input_data_len = ring_buf_put(&callback_low_priority_ring_buf, &input_data, 1);
-        if (input_data_len != 1) {
-            LOG_ERR("Full ring buffer, enqueue data with length %d", input_data_len);
-            k_oops();
-        }
-        break;
-    case MPSL_TIMESLOT_SIGNAL_SESSION_CLOSED:
-        input_data_len = ring_buf_put(&callback_low_priority_ring_buf, &input_data, 1);
-        if (input_data_len != 1) {
-            LOG_ERR("Full ring buffer, enqueue data with length %d", input_data_len);
-            k_oops();
-        }
-        break;
     
-    case MPSL_TIMESLOT_SIGNAL_INVALID_RETURN:
-    case MPSL_TIMESLOT_SIGNAL_CANCELLED:
-    case MPSL_TIMESLOT_SIGNAL_BLOCKED:
-        // if timeslot is blocked, we need to request a new timeslot
-        app_mpsl_session_operation(RESCHEDULE);
+		case MPSL_TIMESLOT_SIGNAL_OVERSTAYED:
+			LOG_WRN("something overstayed!");
+			signal_callback_return_param.callback_action = MPSL_TIMESLOT_SIGNAL_ACTION_END;
+			p_ret_val = &signal_callback_return_param;
+			set_timeslot_active_status(false);
+			break;
 
-        // No return action in this case
-        signal_callback_return_param.callback_action =
+		case MPSL_TIMESLOT_SIGNAL_CANCELLED:
+			LOG_DBG("something cancelled!");
+			signal_callback_return_param.callback_action = MPSL_TIMESLOT_SIGNAL_ACTION_NONE;
+			p_ret_val = &signal_callback_return_param;
+			set_timeslot_active_status(false);
+			
+			// In this case returning SIGNAL_ACTION_REQUEST causes hardfault. We have to request a new timeslot instead, from thread context. 
+			app_mpsl_session_operation(RESCHEDULE);
+			break;
+
+		case MPSL_TIMESLOT_SIGNAL_BLOCKED:
+			LOG_INF("something blocked!");
+			set_timeslot_active_status(false);
+
+			// Request a new timeslot in this case
+            signal_callback_return_param.callback_action =
             MPSL_TIMESLOT_SIGNAL_ACTION_NONE;
-        p_ret_val = &signal_callback_return_param;
-        LOG_WRN("Callback: Timeslot blocked. Requesting new...\n");
-        break;
-    default:
-        LOG_ERR("unexpected signal: %u", signal_type);
-        // k_oops();
-        break;
-    }
+            p_ret_val = &signal_callback_return_param;
+			app_mpsl_session_operation(RESCHEDULE);
 
-    NVIC_SetPendingIRQ(LOG_OFFLOAD_IRQn);
+            // // Why can't we request a new timeslot this way?
+            // // it causes MPSL ASSERT: 106, 491
+            // signal_callback_return_param.callback_action = MPSL_TIMESLOT_SIGNAL_ACTION_REQUEST;
+            // signal_callback_return_param.params.request.p_next = &timeslot_request_when_blocked;
+			// p_ret_val = &signal_callback_return_param;
+
+			break;
+
+		case MPSL_TIMESLOT_SIGNAL_INVALID_RETURN:
+			LOG_WRN("something gave invalid return");
+			signal_callback_return_param.callback_action = MPSL_TIMESLOT_SIGNAL_ACTION_END;
+			p_ret_val = &signal_callback_return_param;
+			set_timeslot_active_status(false);
+			break;
+
+		case MPSL_TIMESLOT_SIGNAL_SESSION_IDLE:
+			LOG_INF("idle");
+
+			// Request a new timeslot in this case
+			app_mpsl_session_operation(RESCHEDULE);
+
+			signal_callback_return_param.callback_action = MPSL_TIMESLOT_SIGNAL_ACTION_NONE;
+			p_ret_val = &signal_callback_return_param;
+			set_timeslot_active_status(false);
+			break;
+
+		case MPSL_TIMESLOT_SIGNAL_SESSION_CLOSED:
+			LOG_INF("Session closed");
+
+			signal_callback_return_param.callback_action = MPSL_TIMESLOT_SIGNAL_ACTION_NONE;
+			p_ret_val = &signal_callback_return_param;
+			set_timeslot_active_status(false);
+			break;
+
+		default:
+			LOG_ERR("unexpected signal: %u", signal_type);
+			k_oops();
+			break;
+    }
 
     return p_ret_val;
 }
@@ -301,11 +284,8 @@ static void mpsl_nonpreemptible_thread(void)
     int err;
     enum mpsl_timeslot_call api_call = 0;
 
-    IRQ_DIRECT_CONNECT(LOG_OFFLOAD_IRQn, 1, swi1_isr, 0);
-    irq_enable(LOG_OFFLOAD_IRQn);
-
-    NRF_P0->DIRSET = BIT(28);
-	NRF_P0->OUTCLR = BIT(28);
+    // NRF_P0->DIRSET = BIT(28);
+	// NRF_P0->OUTCLR = BIT(28);
 
     /* Initialize to invalid session id */
     mpsl_timeslot_session_id_t session_id = 0xFFu;

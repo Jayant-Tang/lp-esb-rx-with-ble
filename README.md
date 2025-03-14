@@ -18,7 +18,7 @@ Time --------------------------------------------------------------
 
 The system is low power during the idle state.
 
-The development of BLE part is not affected at all. The `main.c` is totally same as the [LBS examble](https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/samples/bluetooth/peripheral_lbs/README.html).
+The development of BLE part is not affected at all. The `main.c` is almost same as the [LBS examble](https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/samples/bluetooth/peripheral_lbs/README.html). Only add `bt_conn_le_param_update` in `connected()` callback to increase connection interval.
 
 # Supported Hardware
 
@@ -88,4 +88,15 @@ The development of BLE part is not affected at all. The `main.c` is totally same
 > 
 > ```
 
-# 
+# Known issue
+
+Sometimes when ESB receiving packts or BLE connected, the MPSL will assert fail.
+
+```
+<err> mpsl_init: MPSL ASSERT: 106, 701
+```
+
+```
+<err> mpsl_init: MPSL ASSERT: 106, 400
+```
+

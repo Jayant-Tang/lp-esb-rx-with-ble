@@ -74,13 +74,13 @@ static mpsl_timeslot_request_t timeslot_request_normal = {
     .params.normal.length_us = TIMESLOT_LENGTH_US
 };
 
-static mpsl_timeslot_request_t timeslot_request_when_blocked = {
-    .request_type = MPSL_TIMESLOT_REQ_TYPE_NORMAL,
-    .params.normal.hfclk = MPSL_TIMESLOT_HFCLK_CFG_XTAL_GUARANTEED,
-    .params.normal.priority = MPSL_TIMESLOT_PRIORITY_NORMAL,
-    .params.normal.distance_us = TIMESLOT_REQUEST_DISTANCE_US * 2,
-    .params.normal.length_us = TIMESLOT_LENGTH_US
-};
+// static mpsl_timeslot_request_t timeslot_request_when_blocked = {
+//     .request_type = MPSL_TIMESLOT_REQ_TYPE_NORMAL,
+//     .params.normal.hfclk = MPSL_TIMESLOT_HFCLK_CFG_XTAL_GUARANTEED,
+//     .params.normal.priority = MPSL_TIMESLOT_PRIORITY_NORMAL,
+//     .params.normal.distance_us = TIMESLOT_REQUEST_DISTANCE_US * 4 + 5000, // add offset when timeslot is blocked by higher priority, and request a new timeslot
+//     .params.normal.length_us = TIMESLOT_LENGTH_US
+// };
 
 static mpsl_timeslot_signal_return_param_t signal_callback_return_param;
 
@@ -207,7 +207,12 @@ static mpsl_timeslot_signal_return_param_t *mpsl_timeslot_callback(
         p_ret_val = &signal_callback_return_param;
 
         // forward this signal to the ESB IRQ handler
-        app_mpsl_esb_radio_irq_handler_wrapper();
+        if (m_in_timeslot) {
+            app_mpsl_esb_radio_irq_handler_wrapper();
+        } else {
+            NVIC_ClearPendingIRQ(RADIO_IRQn);
+            NVIC_DisableIRQ(RADIO_IRQn);
+        }
 
         break;
 
@@ -226,7 +231,7 @@ static mpsl_timeslot_signal_return_param_t *mpsl_timeslot_callback(
 			set_timeslot_active_status(false);
 			
 			// In this case returning SIGNAL_ACTION_REQUEST causes hardfault. We have to request a new timeslot instead, from thread context. 
-			app_mpsl_session_operation(RESCHEDULE);
+			app_mpsl_session_operation(MAKE_REQUEST);
 			break;
 
 		case MPSL_TIMESLOT_SIGNAL_BLOCKED:
@@ -237,13 +242,8 @@ static mpsl_timeslot_signal_return_param_t *mpsl_timeslot_callback(
             signal_callback_return_param.callback_action =
             MPSL_TIMESLOT_SIGNAL_ACTION_NONE;
             p_ret_val = &signal_callback_return_param;
-			app_mpsl_session_operation(RESCHEDULE);
 
-            // // Why can't we request a new timeslot this way?
-            // // it causes MPSL ASSERT: 106, 491
-            // signal_callback_return_param.callback_action = MPSL_TIMESLOT_SIGNAL_ACTION_REQUEST;
-            // signal_callback_return_param.params.request.p_next = &timeslot_request_when_blocked;
-			// p_ret_val = &signal_callback_return_param;
+			app_mpsl_session_operation(MAKE_REQUEST);
 
 			break;
 
@@ -258,7 +258,7 @@ static mpsl_timeslot_signal_return_param_t *mpsl_timeslot_callback(
 			LOG_INF("idle");
 
 			// Request a new timeslot in this case
-			app_mpsl_session_operation(RESCHEDULE);
+			app_mpsl_session_operation(MAKE_REQUEST);
 
 			signal_callback_return_param.callback_action = MPSL_TIMESLOT_SIGNAL_ACTION_NONE;
 			p_ret_val = &signal_callback_return_param;
@@ -306,7 +306,7 @@ static void mpsl_nonpreemptible_thread(void)
                     &session_id);
                 if (err) {
                     LOG_ERR("Timeslot session open error: %d", err);
-                    k_oops();
+                    // k_oops();
                 }
                 break;
             case MAKE_REQUEST:
@@ -315,31 +315,32 @@ static void mpsl_nonpreemptible_thread(void)
                     &timeslot_request_earliest);
                 if (err) {
                     LOG_ERR("Timeslot request error: %d", err);
-                    k_oops();
+                    // k_oops();
                 }
                 break;
             case CLOSE_SESSION:
                 err = mpsl_timeslot_session_close(session_id);
                 if (err) {
                     LOG_ERR("Timeslot session close error: %d", err);
-                    k_oops();
+                    // k_oops();
                 }
                 break;
-            case RESCHEDULE:
-                err = mpsl_timeslot_request(
-                    session_id,
-                    &timeslot_request_when_blocked);
-                if (err) {
-                    LOG_ERR("Timeslot request error: %d", err);
-                    k_oops();
-                }
-                break;
+            // case RESCHEDULE:
+            //     err = mpsl_timeslot_request(
+            //         session_id,
+            //         &timeslot_request_when_blocked);
+            //     if (err) {
+            //         LOG_ERR("Timeslot reschedule error: %d", err);
+            //         // k_oops();
+            //     }
+            //     break;
             default:
                 LOG_ERR("Wrong timeslot API call");
                 k_oops();
                 break;
             }
         }
+        // prevent too many requests at short time
     }
 }
 

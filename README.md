@@ -88,15 +88,10 @@ The development of BLE part is not affected at all. The `main.c` is almost same 
 > 
 > ```
 
+# TODO
+
+- Support nRF5340. This should run in network core.
+- Support nRF54L15. MPSL and ESB both need timer, but there are only 1 timer (Timer10) in Radio Power Domain, need a workaround.
+
 # Known issue
-
-Sometimes when ESB receiving packts or BLE connected, the MPSL will assert fail.
-
-```
-<err> mpsl_init: MPSL ASSERT: 106, 701
-```
-
-```
-<err> mpsl_init: MPSL ASSERT: 106, 400
-```
 

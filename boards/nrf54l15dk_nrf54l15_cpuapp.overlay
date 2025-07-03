@@ -1,0 +1,13 @@
+/*
+ * Copyright (c) 2025 Nordic Semiconductor
+ *
+ * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+ */
+
+&dppic10 {
+	status = "okay";
+};
+
+&dppic20 {
+	status = "okay";
+};

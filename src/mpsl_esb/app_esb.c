@@ -20,10 +20,8 @@ RING_BUF_DECLARE(timeslot_evt_ring_buf, 10);
 K_MSGQ_DEFINE(app_timeslot_msgq, sizeof(app_ts_state_t), 10, 4);
 
 static struct esb_payload rx_payload;
-static struct esb_payload tx_payload = ESB_CREATE_PAYLOAD(0,
-	0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17);
-
-
+// static struct esb_payload tx_payload = ESB_CREATE_PAYLOAD(0,
+// 	0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17);
 
 void event_handler(struct esb_evt const *event)
 {

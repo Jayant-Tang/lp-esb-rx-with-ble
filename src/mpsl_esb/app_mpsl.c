@@ -16,6 +16,7 @@
 #include <mpsl_timeslot.h>
 #include <mpsl.h>
 #include <hal/nrf_timer.h>
+#include <hal/nrf_radio.h>
 
 #include "app_mpsl.h"
 
@@ -40,15 +41,19 @@ enum mpsl_timeslot_call {
 #if defined(CONFIG_SOC_SERIES_NRF53X)
     #define LOG_OFFLOAD_IRQn SWI1_IRQn
     #define MPSL_TIMER0 NRF_TIMER0
+    #define MPSL_RADIO_IRQn RADIO_IRQn
 #elif defined(CONFIG_SOC_SERIES_NRF52X)
     #define LOG_OFFLOAD_IRQn SWI1_EGU1_IRQn
     #define MPSL_TIMER0 NRF_TIMER0
+    #define MPSL_RADIO_IRQn RADIO_IRQn
 #elif defined(CONFIG_SOC_SERIES_NRF54LX)
     #define LOG_OFFLOAD_IRQn EGU10_IRQn
     #define MPSL_TIMER0 NRF_TIMER10
+    #define MPSL_RADIO_IRQn RADIO_0_IRQn
 #elif defined(CONFIG_SOC_SERIES_NRF54HX)
     #define LOG_OFFLOAD_IRQn EGU020_IRQn
     #define MPSL_TIMER0 NRF_TIMER020
+    #define MPSL_RADIO_IRQn RADIO_0_IRQn
 #endif /* CONFIG_SOC_SERIES_NRF53X */
 
 /* if we need to continously request for new timeslot */
@@ -90,6 +95,135 @@ RING_BUF_DECLARE(callback_low_priority_ring_buf, 10);
 
 /* Message queue for requesting MPSL API calls to non-preemptible thread */
 K_MSGQ_DEFINE(mpsl_api_msgq, sizeof(enum mpsl_timeslot_call), 10, 4);
+
+#if !defined(RADIO_POWER_POWER_Msk)
+static inline void radio_reset_without_power_reg(void)
+{
+    /* SUBSCRIBE registers */
+    NRF_RADIO->SUBSCRIBE_TXEN      = 0;
+    NRF_RADIO->SUBSCRIBE_RXEN      = 0;
+    NRF_RADIO->SUBSCRIBE_START     = 0;
+    NRF_RADIO->SUBSCRIBE_STOP      = 0;
+    NRF_RADIO->SUBSCRIBE_DISABLE   = 0;
+    NRF_RADIO->SUBSCRIBE_RSSISTART = 0;
+    NRF_RADIO->SUBSCRIBE_BCSTART   = 0;
+    NRF_RADIO->SUBSCRIBE_BCSTOP    = 0;
+    NRF_RADIO->SUBSCRIBE_EDSTART   = 0;
+    NRF_RADIO->SUBSCRIBE_EDSTOP    = 0;
+    NRF_RADIO->SUBSCRIBE_CCASTART  = 0;
+    NRF_RADIO->SUBSCRIBE_CCASTOP   = 0;
+
+    /* EVENT registers */
+    NRF_RADIO->EVENTS_READY      = 0;
+    NRF_RADIO->EVENTS_ADDRESS    = 0;
+    NRF_RADIO->EVENTS_PAYLOAD    = 0;
+    NRF_RADIO->EVENTS_END        = 0;
+    NRF_RADIO->EVENTS_DISABLED   = 0;
+    NRF_RADIO->EVENTS_DEVMATCH   = 0;
+    NRF_RADIO->EVENTS_DEVMISS    = 0;
+    NRF_RADIO->EVENTS_BCMATCH    = 0;
+    NRF_RADIO->EVENTS_CRCOK      = 0;
+    NRF_RADIO->EVENTS_CRCERROR   = 0;
+    NRF_RADIO->EVENTS_FRAMESTART = 0;
+    NRF_RADIO->EVENTS_EDEND      = 0;
+    NRF_RADIO->EVENTS_EDSTOPPED  = 0;
+    NRF_RADIO->EVENTS_CCAIDLE    = 0;
+    NRF_RADIO->EVENTS_CCABUSY    = 0;
+    NRF_RADIO->EVENTS_CCASTOPPED = 0;
+    NRF_RADIO->EVENTS_RATEBOOST  = 0;
+    NRF_RADIO->EVENTS_TXREADY    = 0;
+    NRF_RADIO->EVENTS_RXREADY    = 0;
+    NRF_RADIO->EVENTS_MHRMATCH   = 0;
+    NRF_RADIO->EVENTS_PHYEND     = 0;
+    NRF_RADIO->EVENTS_CTEPRESENT = 0;
+
+    /* PUBLISH registers */
+    NRF_RADIO->PUBLISH_READY      = 0;
+    NRF_RADIO->PUBLISH_ADDRESS    = 0;
+    NRF_RADIO->PUBLISH_PAYLOAD    = 0;
+    NRF_RADIO->PUBLISH_END        = 0;
+    NRF_RADIO->PUBLISH_DISABLED   = 0;
+    NRF_RADIO->PUBLISH_DEVMATCH   = 0;
+    NRF_RADIO->PUBLISH_DEVMISS    = 0;
+    NRF_RADIO->PUBLISH_BCMATCH    = 0;
+    NRF_RADIO->PUBLISH_CRCOK      = 0;
+    NRF_RADIO->PUBLISH_CRCERROR   = 0;
+    NRF_RADIO->PUBLISH_FRAMESTART = 0;
+    NRF_RADIO->PUBLISH_EDEND      = 0;
+    NRF_RADIO->PUBLISH_EDSTOPPED  = 0;
+    NRF_RADIO->PUBLISH_CCAIDLE    = 0;
+    NRF_RADIO->PUBLISH_CCABUSY    = 0;
+    NRF_RADIO->PUBLISH_CCASTOPPED = 0;
+    NRF_RADIO->PUBLISH_RATEBOOST  = 0;
+    NRF_RADIO->PUBLISH_TXREADY    = 0;
+    NRF_RADIO->PUBLISH_RXREADY    = 0;
+    NRF_RADIO->PUBLISH_MHRMATCH   = 0;
+    NRF_RADIO->PUBLISH_PHYEND     = 0;
+    NRF_RADIO->PUBLISH_CTEPRESENT = 0;
+
+    /* INTEN registers */
+    NRF_RADIO->INTENSET00 = 0;
+    NRF_RADIO->INTENCLR00 = 0xffffffff;
+
+#if !defined(NRF54H20_ENGA_XXAA)
+    NRF_RADIO->TASKS_SOFTRESET = 1;
+#else /* defined(NRF54H20_ENGA_XXAA) */
+    NRF_RADIO->TASKS_TXEN       = 0;
+    NRF_RADIO->TASKS_RXEN       = 0;
+    NRF_RADIO->TASKS_START      = 0;
+    NRF_RADIO->TASKS_STOP       = 0;
+    NRF_RADIO->TASKS_DISABLE    = 0;
+    NRF_RADIO->TASKS_RSSISTART  = 0;
+    NRF_RADIO->TASKS_BCSTART    = 0;
+    NRF_RADIO->TASKS_BCSTOP     = 0;
+    NRF_RADIO->TASKS_EDSTART    = 0;
+    NRF_RADIO->TASKS_EDSTOP     = 0;
+    NRF_RADIO->TASKS_CCASTART   = 0;
+    NRF_RADIO->TASKS_CCASTOP    = 0;
+    NRF_RADIO->SHORTS           = 0;
+    NRF_RADIO->PACKETPTR        = 0;
+    NRF_RADIO->FREQUENCY        = 0;
+    NRF_RADIO->TXPOWER          = 0;
+    NRF_RADIO->MODE             = 0;
+    NRF_RADIO->PCNF0            = 0;
+    NRF_RADIO->PCNF1            = 0;
+    NRF_RADIO->BASE0            = 0;
+    NRF_RADIO->BASE1            = 0;
+    NRF_RADIO->PREFIX0          = 0;
+    NRF_RADIO->PREFIX1          = 0;
+    NRF_RADIO->TXADDRESS        = 0;
+    NRF_RADIO->RXADDRESSES      = 0;
+    NRF_RADIO->CRCCNF           = 0;
+    NRF_RADIO->CRCPOLY          = 0;
+    NRF_RADIO->CRCINIT          = 0;
+    NRF_RADIO->TIFS             = 0;
+    NRF_RADIO->DATAWHITEIV      = 0;
+    NRF_RADIO->BCC              = 0;
+    NRF_RADIO->DACNF            = 0;
+    NRF_RADIO->MHRMATCHCONF     = 0;
+    NRF_RADIO->MHRMATCHMASK     = 0;
+    NRF_RADIO->SFD              = 0xA7;
+    NRF_RADIO->EDCTRL           = RADIO_EDCTRL_ResetValue;
+    NRF_RADIO->CCACTRL          = 0x52D0000;
+    NRF_RADIO->DFEMODE          = 0;
+    NRF_RADIO->CTEINLINECONF    = 0x2800;
+    NRF_RADIO->DFECTRL1         = 0x23282;
+    NRF_RADIO->DFECTRL2         = 0;
+    NRF_RADIO->SWITCHPATTERN    = 0;
+    NRF_RADIO->CLEARPATTERN     = 0;
+    NRF_RADIO->DFEPACKET.PTR    = 0;
+    NRF_RADIO->DFEPACKET.MAXCNT = 0x1000;
+
+    for (uint8_t i = 0; i < 8; i++)
+    {
+        NRF_RADIO->DAB[i]          = 0;
+        NRF_RADIO->DAP[i]          = 0;
+        NRF_RADIO->PSEL.DFEGPIO[i] = 0xFFFFFFFF;
+    }
+#endif /* !defined(NRF54H20_ENGA_XXAA) */
+}
+
+#endif /* !defined(RADIO_POWER_POWER_Msk) */
 
 static void set_timeslot_active_status(bool active)
 {
@@ -163,10 +297,15 @@ static mpsl_timeslot_signal_return_param_t *mpsl_timeslot_callback(
         p_ret_val = &signal_callback_return_param;
         
         // Reset the radio to make sure no configuration remains from BLE
-        NVIC_ClearPendingIRQ(RADIO_IRQn);
-        NRF_RADIO->POWER = RADIO_POWER_POWER_Disabled << RADIO_POWER_POWER_Pos;
-        NRF_RADIO->POWER = RADIO_POWER_POWER_Enabled << RADIO_POWER_POWER_Pos;
-        NVIC_ClearPendingIRQ(RADIO_IRQn);
+        NVIC_ClearPendingIRQ(MPSL_RADIO_IRQn);
+
+#if defined(RADIO_POWER_POWER_Msk)
+        nrf_radio_power_set(NRF_RADIO, false);
+        nrf_radio_power_set(NRF_RADIO, true);
+#else
+        radio_reset_without_power_reg();
+#endif
+        NVIC_ClearPendingIRQ(MPSL_RADIO_IRQn);
 
         /* Setup timer to trigger an interrupt (and thus the TIMER0
         * signal) before timeslot end.
@@ -210,8 +349,8 @@ static mpsl_timeslot_signal_return_param_t *mpsl_timeslot_callback(
         if (m_in_timeslot) {
             app_mpsl_esb_radio_irq_handler_wrapper();
         } else {
-            NVIC_ClearPendingIRQ(RADIO_IRQn);
-            NVIC_DisableIRQ(RADIO_IRQn);
+            NVIC_ClearPendingIRQ(MPSL_RADIO_IRQn);
+            NVIC_DisableIRQ(MPSL_RADIO_IRQn);
         }
 
         break;

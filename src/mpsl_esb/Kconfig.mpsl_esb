@@ -1,20 +1,19 @@
-config APP_ESB_PRX_LISTEN_WINDOW_US
-	int "ESB PRX listening Window in microseconds"
-	default 5000
+config APP_ESB_MPSL_TIMESLOT_RX_INTERVAL_US
+	int "ESB PRX MPSL listen interval (us)"
+	default 0
 	help
-        The length of the MPSL timeslot in microseconds. In the timeslot, the ESB PRX listens for incoming packets.
+	  Interval between ESB PRX listen windows in microseconds.
+	  When non-zero, the patched ESB PRX path requests MPSL NORMAL
+	  timeslots at this fixed interval instead of continuously requesting
+	  EARLIEST timeslots.
 
-config APP_ESB_PRX_LISTEN_INTERVAL_US
-    int "ESB PRX listening interval in microseconds"
-    default 500000
-    help
-        The interval between the ESB PRX listening windows in microseconds.
-config APP_ESB_OVER_MPSL
-    bool
-    default y
-    help
-        This configuration indicates that the ESB is used over the MPSL.
-        Do not disable this configuration.  
+config APP_ESB_MPSL_TIMESLOT_RX_WINDOW_US
+	int "ESB PRX MPSL listen window (us)"
+	default 0
+	help
+	  Approximate duration of each ESB PRX listen window in microseconds.
+	  The patched ESB PRX path limits timeslot extensions to approximate
+	  this window length. Set to 0 to keep upstream ESB behavior.
 
 module = APP_ESB
 module-str = app-esb

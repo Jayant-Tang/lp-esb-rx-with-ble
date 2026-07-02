@@ -2,6 +2,8 @@
 *.swp
 *~
 
+*.agent/
+
 # build
 /build*/
 

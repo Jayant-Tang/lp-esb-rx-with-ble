@@ -269,7 +269,7 @@ int main(void)
 	}
 
     struct bt_le_adv_param adv_param = {
-        .options = BT_LE_ADV_OPT_CONNECTABLE,
+        .options = BT_LE_ADV_OPT_CONN,
         .interval_min = 1600, // 1600*0.625 = 1s
         .interval_max = 1600, // 1600*0.625 = 1s
         .peer = NULL,

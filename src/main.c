@@ -61,8 +61,8 @@ static void connected(struct bt_conn *conn, uint8_t err)
 	dk_set_led_on(CON_STATUS_LED);
 
 	struct bt_le_conn_param param = {
-		.interval_min = 240, // 240*1.25ms = 300ms
-		.interval_max = 480, // 480*1.25ms = 600ms
+		.interval_min = 400, // 400 * 1.25 ms = 500 ms
+		.interval_max = 400, // 400 * 1.25 ms = 500 ms
 		.latency = 0,       
 		.timeout = 200,     // 200*10ms = 2s
         /**
@@ -270,8 +270,8 @@ int main(void)
 
     struct bt_le_adv_param adv_param = {
         .options = BT_LE_ADV_OPT_CONN,
-        .interval_min = 1600, // 1600*0.625 = 1s
-        .interval_max = 1600, // 1600*0.625 = 1s
+        .interval_min = 800, // 800 * 0.625 ms = 500 ms
+        .interval_max = 800, // 800 * 0.625 ms = 500 ms
         .peer = NULL,
     };
 

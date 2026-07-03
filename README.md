@@ -99,14 +99,35 @@ Time -------------------------------------------------------------
 Time -------------------------------------------------------------
 ```
 
-The low-power behavior is configured in `src/mpsl_esb/mpsl-esb-overlay.conf`:
+The low-power behavior is configured in `src/mpsl_esb/Kconfig.mpsl_esb`:
 
 ```conf
+CONFIG_ESB_MPSL_TIMESLOT=y
+CONFIG_ESB_CLOCK_INIT=n
 CONFIG_APP_ESB_MPSL_TIMESLOT_RX_INTERVAL_US=500000
 CONFIG_APP_ESB_MPSL_TIMESLOT_RX_WINDOW_US=5000
 ```
 
 This means the PRX listens for about 5 ms every 500 ms.
+
+## HFCLK Handling
+
+The official ESB samples enable `CONFIG_ESB_CLOCK_INIT=y`. With that option,
+`esb_init()` requests the HFCLK and keeps it running until `esb_disable()` is
+called. This is convenient for throughput-oriented samples, but it keeps the
+receiver current high in a low-power always-on design.
+
+This project uses `CONFIG_ESB_MPSL_TIMESLOT=y`, and each ESB timeslot request
+already asks MPSL for `MPSL_TIMESLOT_HFCLK_CFG_XTAL_GUARANTEED`. MPSL therefore brings
+up the HFCLK only for the granted radio window. For this reason,
+`CONFIG_ESB_CLOCK_INIT` is not needed and explicitly disabled by default in
+`src/mpsl_esb/Kconfig.mpsl_esb`.
+
+## Power Measurement
+
+Measured current waveform:
+
+![Measured power consumption](imgs/power_consumption.png)
 
 ## SDK Patch
 
@@ -140,16 +161,14 @@ the upstream behavior.
 2. Copy `sdk_changes/v3.3.0/nrf/subsys/esb/esb.c` to the same path in the NCS tree.
 3. Build the application:
 
-```powershell
-nrfutil sdk-manager toolchain launch --ncs-version=v3.3.0 --chdir D:\ncs\v3.3.0 -- `
-  west build -p always -b nrf54l15dk/nrf54l15/cpuapp -d build_nrf54l15 .
+```bash
+west build -p always -b nrf54l15dk/nrf54l15/cpuapp -d build_nrf54l15 .
 ```
 
 For nRF52840DK:
 
-```powershell
-nrfutil sdk-manager toolchain launch --ncs-version=v3.3.0 --chdir D:\ncs\v3.3.0 -- `
-  west build -p always -b nrf52840dk/nrf52840 -d build_nrf52840 .
+```bash
+west build -p always -b nrf52840dk/nrf52840 -d build_nrf52840 .
 ```
 
 ## How to Test

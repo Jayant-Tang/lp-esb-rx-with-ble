@@ -1,6 +1,24 @@
+config ESB
+	default y
+
+config ESB_MPSL_TIMESLOT
+	default y if ESB
+
+config CLOCK_CONTROL
+	default y if ESB
+
+config MPSL_TIMESLOT_SESSION_COUNT
+	default 2 if ESB_MPSL_TIMESLOT
+
+config RING_BUFFER
+	default y if ESB
+
+config ESB_CLOCK_INIT
+	default n if ESB_MPSL_TIMESLOT
+
 config APP_ESB_MPSL_TIMESLOT_RX_INTERVAL_US
 	int "ESB PRX MPSL listen interval (us)"
-	default 0
+	default 500000
 	help
 	  Interval between ESB PRX listen windows in microseconds.
 	  When non-zero, the patched ESB PRX path requests MPSL NORMAL
@@ -9,7 +27,7 @@ config APP_ESB_MPSL_TIMESLOT_RX_INTERVAL_US
 
 config APP_ESB_MPSL_TIMESLOT_RX_WINDOW_US
 	int "ESB PRX MPSL listen window (us)"
-	default 0
+	default 5000
 	help
 	  Approximate duration of each ESB PRX listen window in microseconds.
 	  The patched ESB PRX path limits timeslot extensions to approximate

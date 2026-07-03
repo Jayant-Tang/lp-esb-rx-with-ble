@@ -4,6 +4,8 @@
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 #
 
+rsource "src/mpsl_esb/Kconfig.mpsl_esb"
+
 source "Kconfig.zephyr"
 
 menu "Nordic LED-Button BLE GATT service sample"
@@ -23,5 +25,3 @@ config BT_LBS_SECURITY_ENABLED
 	  "Enable BLE security for the LED-Button service"
 
 endmenu
-
-rsource "src/mpsl_esb/Kconfig.mpsl_esb"
